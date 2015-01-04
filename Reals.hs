@@ -100,9 +100,9 @@ instance IntervalDomain q => Overt (ClosedInterval q) (RealNum q) where
      exists (ClosedInterval (a,b)) p = error "Not implemented"
 
 -- | We define the a particular implementation of reals in terms of Dyadic numbers.
--- Because 'IntervalDomain' has a default implementation for all of its components we
--- don't have to implement anything.
-instance IntervalDomain Dyadic
+-- We need to implement only width. 
+instance IntervalDomain Dyadic where
+	width Interval{lower=a, upper=b} = b - a 
 
 -- | This is a convenience function which allows us to write @exact 1.3@ as a
 -- conversion from floating points to real numbers. There probably is a better way of
@@ -110,6 +110,10 @@ instance IntervalDomain Dyadic
 exact :: RealNum Dyadic -> RealNum Dyadic
 exact x = x
 
+-- | This function convert elements of type @q@ in elements of type @RealNum q@.
+toReal :: IntervalDomain q => q -> RealNum q
+toReal x = Staged $ \s -> Interval { lower = normalize s x, upper = normalize (anti s) x }
+			
 -- | Reals form a complete space, which means that every Cauchy sequence of reals has
 -- a limit. In the implementation this is manifested by the existence of an operator
 -- which computes the limit of a Cauchy sequence. The error bounds for the sequence are
@@ -131,14 +135,13 @@ lim x =
 -- function 'approx_to x k' computes an approximation @a@ of type @q@ which is within
 -- @2^-k@ of @x@.
 approx_to :: IntervalDomain q => RealNum q -> Int -> q
-approx_to x k =
-    error "approx_to not implemented"
-    {- the simplest way to implement approx_to is to keep calling
-       @approximate x (prec RoundDown n)@ until @n@ is so large that the returned
-       interval has width at most @2^(-n-1)@. The center of the
-       interval is the approximation we seek.
+approx_to x k = loop 0
+				where loop n = let i = approximate x (prec RoundDown n)
+							   in case (toReal (width i)) < 1/2^(k+1) of 
+									True -> midpoint (lower i) (upper i)
+									False -> loop $ n+1
 
-       There are several possibilities for optimization. Here we describe one. Let
+      {- There are several possibilities for optimization. Here we describe one. Let
        @a_n@ be the midpoint of the interval @approximate x (prec RoundDown n)@ and
        let @r_n@ be its width. We are looking for @n@ such that @r_n < 2^{ -n-1}@.
        One heuristic is to assume that @r_n@'s form a geometric series. From this we

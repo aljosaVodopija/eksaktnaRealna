@@ -37,13 +37,13 @@ class (Show q, Ord q) => ApproximateField q where
   log2 :: q -> Int -- ^ @log2 q@ is a number @k@ such that @2^k <= abs q <= 2^(k+1)@.
 
   midpoint :: q -> q -> q -- ^ exact midpoint
-
+  
   zero :: q
   positive_inf :: q
   negative_inf :: q
-
+  
   toFloat :: q -> Double
-
+  
   -- approximate operations
   app_add :: Stage -> q -> q -> q
   app_sub :: Stage -> q -> q -> q

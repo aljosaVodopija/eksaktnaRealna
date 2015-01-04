@@ -43,7 +43,7 @@ class ApproximateField q => IntervalDomain q  where
   inormalize :: Stage -> Interval q -> Interval q
   embed :: Stage -> q -> Interval q
   split :: Interval q -> (Interval q, Interval q)
-  -- width :: Interval q -> q
+  width :: Interval q -> q
 
   iless i j = upper i < lower j
 
