@@ -120,7 +120,7 @@ instance IntervalDomain q => Overt (ClosedInterval q) (RealNum q) where
 -- | We define the a particular implementation of reals in terms of Dyadic numbers.
 -- We need to implement only width. 
 instance IntervalDomain Dyadic where
-	width Interval{lower=a, upper=b} = b - a 
+	 width Interval{lower=a, upper=b} = b - a 
 
 -- | This is a convenience function which allows us to write @exact 1.3@ as a
 -- conversion from floating points to real numbers. There probably is a better way of
@@ -130,23 +130,27 @@ exact x = x
 
 -- | This function convert elements of type @q@ in elements of type @RealNum q@.
 toReal :: IntervalDomain q => q -> RealNum q
-toReal x = Staged $ \s -> Interval { lower = normalize s x, upper = normalize (anti s) x }
+toReal x = limit $ \s -> Interval { lower = normalize s x, upper = normalize (anti s) x }
 			
 -- | Reals form a complete space, which means that every Cauchy sequence of reals has
 -- a limit. In the implementation this is manifested by the existence of an operator
 -- which computes the limit of a Cauchy sequence. The error bounds for the sequence are
 -- given explicitly.
 lim :: IntervalDomain q => (Int -> (RealNum q, q)) -> RealNum q
-lim x =
-    error "Limits of Cauchy sequences are not implemented"
-    {- there are several ways to implement 'lim', see the end of Section 7 of
-
-       http://math.andrej.com/2008/01/31/a-constructive-theory-of-domains-suitable-for-implementation/
-
-    -}
-
-
-
+lim x =  
+     limit (\s -> 
+        let r = (rounding s == RoundDown)
+            n = precision s
+            b i j = app_sub s' (lower (approximate (fst $ x i) s')) (snd $ x i)
+                where s' = prec RoundDown j	
+            c i j = app_add s' (upper (approximate (fst $ x i) s')) (snd $ x i)
+                where s' = prec RoundUp j
+            k i j = j -- mozne izboljsave
+        in case r of
+            True -> Interval {lower = maximum [b i (k i n) | i <- [0..n]], upper = minimum [c i (k i n) | i <- [0..n]]}
+            False -> Interval {lower = minimum [c i (k i n) | i <- [0..n]], upper = maximum [b i (k i n) | i <- [0..n]]}
+     )
+	 
 -- | Reals form an Archimedean field. Topologically speaking, this means that the
 -- underlying approximate field @q@ is dense in the reals. Computationally this means
 -- that we can compute arbitrarily good @q@-approximations to real numbers. The
@@ -154,10 +158,10 @@ lim x =
 -- @2^-k@ of @x@.
 approx_to :: IntervalDomain q => RealNum q -> Int -> q
 approx_to x k = loop 0
-				where loop n = let i = approximate x (prec RoundDown n)
-							   in case (toReal (width i)) < 1/2^(k+1) of 
-									True -> midpoint (lower i) (upper i)
-									False -> loop $ n+1
+                where loop n = let i = approximate x (prec RoundDown n)
+                               in case (toReal (width i)) < 1/2^(k+1) of 
+                                    True -> midpoint (lower i) (upper i)
+                                    False -> loop $ n+1
 
       {- There are several possibilities for optimization. Here we describe one. Let
        @a_n@ be the midpoint of the interval @approximate x (prec RoundDown n)@ and
@@ -168,3 +172,11 @@ approx_to x k = loop 0
        we try something else. The drawback is that we might end up over-estimating
        the needed precision @n@. -}
 
+-- | This function is approx_to for @RealNum Dyadic@. Is faster than normal. 
+approx_to' :: RealNum Dyadic -> Int -> Dyadic
+approx_to' x k = loop 0
+                where loop n = let i = approximate x (prec RoundDown n)
+                                   a = Dyadic {mant = 1, expo= -(k+1)}  
+				               in case (width i) < a of 
+                                    True -> midpoint (lower i) (upper i)
+                                    False -> loop $ n+1
