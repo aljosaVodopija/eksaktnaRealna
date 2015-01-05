@@ -95,10 +95,28 @@ instance IntervalDomain q => Compact (ClosedInterval q) (RealNum q) where
        in sweep [(0,a,b)]
      )
 
--- | Missing: overtness of reals, open interval (a,b) and closed interval [a,b]
+-- | Overtness of reals, open interval (a,b) and closed interval [a,b]
 instance IntervalDomain q => Overt (ClosedInterval q) (RealNum q) where
-     exists (ClosedInterval (a,b)) p = error "Not implemented"
-
+	-- To še ne dela za `more` >= 0.25 in `less` <= 0.0
+   exists (ClosedInterval (a,b)) p = 
+	 limit (\s ->
+       let r = rounding s
+           n = precision s
+           test_interval u v = case r of
+                                 RoundDown -> Interval {lower = u, upper = v}
+                                 RoundUp   -> let w = midpoint u v in Interval {lower = w, upper = w}
+           sweep [] = True
+           sweep ((k,a,b):lst) = let x = return $ test_interval a b
+                                    in case (r, approximate (p x) (prec r k)) of
+                                      (RoundDown, False) -> (k < n) ||
+                                                            (let c = midpoint a b in sweep (lst ++ [(k+1,a,c), (k+1,c,b)]))
+                                      (RoundDown, True)  -> True
+                                      (RoundUp,   False) -> sweep lst
+                                      (RoundUp,   True)  -> (k >= n) &&
+                                                            (let c = midpoint a b in sweep (lst ++ [(k+1,a,c), (k+1,c,b)]))
+       in sweep [(0,a,b)]
+     )
+     
 -- | We define the a particular implementation of reals in terms of Dyadic numbers.
 -- We need to implement only width. 
 instance IntervalDomain Dyadic where
