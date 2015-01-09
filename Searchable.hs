@@ -14,9 +14,9 @@ search s p =
 
 -- quantifiers
 
-exists s p = p (find s p)
+exists' s p = p (find s p)
 
-forall s p = not (exists s (not . p))
+forall' s p = not (exists' s (not . p))
 
 -- some searchable spaces
 
@@ -26,10 +26,10 @@ singleton x = Finder (\p -> x)
 -- doubleton
 doubleton x y = Finder (\p -> if p x then x else y)
 
--- finite non-empty sets
-finite_set :: [a] -> Searchable a
+-- non-empty sets
+set :: [a] -> Searchable a
 
-finite_set lst = Finder (\p ->
+set lst = Finder (\p ->
     let loop []     = undefined
         loop [x]    = x
         loop (x:xs) = if p x then x else loop xs
@@ -42,7 +42,7 @@ sum s t = Finder (\p -> let x = Left (find s (p . Left))
 
 -- a union of a searchable family of searchable spaces ss
 bigUnion :: Searchable (Searchable a) -> Searchable a
-bigUnion ss = Finder (\p -> find (find ss (\s -> exists s p)) p)
+bigUnion ss = Finder (\p -> find (find ss (\s -> exists' s p)) p)
 
 -- a union of two sets is a special case
 union s t = bigUnion (doubleton s t)
@@ -71,4 +71,4 @@ two = doubleton False True
 cantor = prod (repeat two)
 
 -- we may test equality of functions
-equal a f g = forall a (\x -> f x == g x)
+equal' a f g = forall' a (\x -> f x == g x)

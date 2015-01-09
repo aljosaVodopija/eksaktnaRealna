@@ -97,22 +97,22 @@ instance IntervalDomain q => Compact (ClosedInterval q) (RealNum q) where
 
 -- | Overtness of reals, open interval (a,b) and closed interval [a,b]
 instance IntervalDomain q => Overt (ClosedInterval q) (RealNum q) where
-	-- To še ne dela za `more` >= 0.25 in `less` <= 0.0
    exists (ClosedInterval (a,b)) p = 
 	 limit (\s ->
        let r = rounding s
            n = precision s
            test_interval u v = case r of
-                                 RoundDown -> Interval {lower = u, upper = v}
-                                 RoundUp   -> let w = midpoint u v in Interval {lower = w, upper = w}
-           sweep [] = True
+                                 RoundUp -> Interval {lower = v, upper = u}
+                                 RoundDown   -> let w = midpoint u v in Interval {lower = w, upper = w}
+           sweep [] = False
            sweep ((k,a,b):lst) = let x = return $ test_interval a b
                                     in case (r, approximate (p x) (prec r k)) of
-                                      (RoundDown, False) -> (k < n) ||
-                                                            (let c = midpoint a b in sweep (lst ++ [(k+1,a,c), (k+1,c,b)]))
+                                      (RoundDown, False) -> if (k < n) 
+																then (let c = midpoint a b in sweep (lst ++ [(k+1,a,c), (k+1,c,b)]))
+															else False
                                       (RoundDown, True)  -> True
                                       (RoundUp,   False) -> sweep lst
-                                      (RoundUp,   True)  -> (k >= n) &&
+                                      (RoundUp,   True)  -> (k >= n) ||
                                                             (let c = midpoint a b in sweep (lst ++ [(k+1,a,c), (k+1,c,b)]))
        in sweep [(0,a,b)]
      )
@@ -180,3 +180,4 @@ approx_to' x k = loop 0
 				               in case (width i) < a of 
                                     True -> midpoint (lower i) (upper i)
                                     False -> loop $ n+1
+      
