@@ -55,7 +55,7 @@ class (Show q, Ord q) => ApproximateField q where
   app_signum :: Stage -> q -> q
   app_fromInteger :: Stage -> Integer -> q
   app_shift :: Stage -> q -> Int -> q -- ^ shift by a power of 2
-
+  app_power :: Stage -> q -> Int -> q
 
 -- | A dyadic number is of the form @m * 2^e@ where @m@ is the /mantissa/ and @e@ is the /exponent/.
 data Dyadic = Dyadic { mant :: Integer, expo :: Int }
@@ -283,3 +283,5 @@ instance ApproximateField Dyadic where
   app_shift s PositiveInfinity k = PositiveInfinity
   app_shift s NegativeInfinity k = NegativeInfinity
   app_shift s Dyadic {mant=m, expo=e} k = normalize s (Dyadic {mant = m, expo = e + k})
+  
+  app_power s x n = normalize s x^n

@@ -180,4 +180,41 @@ approx_to' x k = loop 0
 				               in case (width i) < a of 
                                     True -> midpoint (lower i) (upper i)
                                     False -> loop $ n+1
-      
+
+instance IntervalDomain q => Floating (RealNum q) where
+    pi = limit(\s -> 
+             let r = (rounding s == RoundDown)
+                 n = precision s
+                 n' = toInteger n
+                 b (-1) t = zero
+                 b k t = 
+				     let s' = if ((k `mod` 2) == t) then (prec RoundUp n) else (prec RoundDown n)
+                         --s'' = if t==0 then (prec RoundUp n) else (prec RoundDown n)
+                     in app_add s'' (app_div s' (app_fromInteger s' (4*((-1)^k))) (app_fromInteger (anti s') (2*k+1))) (b (k-1) t)
+					     where s'' = if t==0 then (prec RoundUp n) else (prec RoundDown n)
+             in case r of
+                 True -> Interval {lower = (b (2*n'+1) 1), upper = (b (2*n') 0)}
+                 False -> Interval {lower = (b (2*n') 0), upper = (b (2*n'+1) 1)}
+         )
+				
+    exp x = limit (\s->
+             let r = (rounding s == RoundDown)
+                 n = precision s
+                 y = approximate x (prec RoundDown n)
+                 l = lower y
+                 u = upper y
+                 b 0 t r' = app_fromInteger s 1
+                 b k t r' = app_add s' (b (k-1) t r') (app_div s' (app_power s' t k) (app_fromInteger (anti s') (product [1..(toInteger k)])))
+                     where s' = prec r' n
+             in case r of
+                 True -> Interval{lower = b n l RoundDown, upper = b n u RoundUp}
+                 False -> Interval{lower = b n u RoundUp, upper = b n l RoundDown}
+		     )
+    log x = error "Not implemented"
+    sin x = error "Not implemented"
+    cos x = error "Not implemented"
+    sinh x = error "Not implemented"
+    cosh x  = error "Not implemented"
+    asinh x = error "Not implemented"
+    acosh x = error "Not implemented"
+    atanh x = error "Not implemented"									
