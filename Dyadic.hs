@@ -15,7 +15,7 @@ module Dyadic (
 ) where
 
 import Data.Bits
-
+import Data.Ratio
 import Staged
 
 {- | An approximate field is a structure in which we can perform approximate
@@ -43,6 +43,7 @@ class (Show q, Ord q) => ApproximateField q where
   negative_inf :: q
   
   toFloat :: q -> Double
+  toRational' :: q -> Rational
   
   -- approximate operations
   app_add :: Stage -> q -> q -> q
@@ -56,6 +57,13 @@ class (Show q, Ord q) => ApproximateField q where
   app_fromInteger :: Stage -> Integer -> q
   app_shift :: Stage -> q -> Int -> q -- ^ shift by a power of 2
   app_power :: Stage -> q -> Int -> q
+  app_fromRational :: Stage -> Rational -> q
+  
+  app_fromRational s r = case signum r of
+							0 -> zero 
+							1 -> app_div s (app_fromInteger s (numerator r)) (app_fromInteger (anti s) (denominator r))
+							-1 -> app_div s' (app_fromInteger s' (numerator r)) (app_fromInteger (anti s') (denominator r))
+							     where s' = anti s
 
 -- | A dyadic number is of the form @m * 2^e@ where @m@ is the /mantissa/ and @e@ is the /exponent/.
 data Dyadic = Dyadic { mant :: Integer, expo :: Int }
@@ -284,4 +292,6 @@ instance ApproximateField Dyadic where
   app_shift s NegativeInfinity k = NegativeInfinity
   app_shift s Dyadic {mant=m, expo=e} k = normalize s (Dyadic {mant = m, expo = e + k})
   
-  app_power s x n = normalize s x^n
+  app_power s x n = normalize s x^n -- definirat za nan pozitive infty...
+ 
+  toRational' Dyadic {mant=m, expo=e} = if signum e == -1 then (toRational m)/2^(-e) else (toRational m)*2^e

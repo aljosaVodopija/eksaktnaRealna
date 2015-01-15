@@ -180,157 +180,104 @@ approx_to' x k = loop 0
 				               in case (width i) < a of 
                                     True -> midpoint (lower i) (upper i)
                                     False -> loop $ n+1
+fac :: Rational -> Rational
+fac n = product [1..n]
+
+tI :: Rational -> Integer
+tI r = numerator r
 
 instance IntervalDomain q => Floating (RealNum q) where
     pi = limit(\s -> 
-             let r = (rounding s == RoundDown)
+             let r = rounding s
                  n = precision s
-                 n' = toInteger n
-                 b (-1) t = zero
-                 b k t = 
-				     let s' = if ((k `mod` 2) == t) then (prec RoundUp n) else (prec RoundDown n)
-                         --s'' = if t==0 then (prec RoundUp n) else (prec RoundDown n)
-                     in app_add s'' (app_div s' (app_fromInteger s' (4*((-1)^k))) (app_fromInteger (anti s') (2*k+1))) (b (k-1) t)
-					     where s'' = if t==0 then (prec RoundUp n) else (prec RoundDown n)
+                 border k r'= let k' = toRational k
+                                  part_serie = 3 + 4 * (sum [ (-1)^((tI i)-1)/((2*i)*(2*i+1)*(2*i+2))|i <- [1..k']])
+                              in app_fromRational (prec r' k) part_serie
              in case r of
-                 True -> Interval {lower = (b (2*n'+1) 1), upper = (b (2*n') 0)}
-                 False -> Interval {lower = (b (2*n') 0), upper = (b (2*n'+1) 1)}
+                 RoundDown -> Interval {lower = (border (2*n) RoundDown), upper = (border (2*n+1) RoundUp)}
+                 RoundUp -> Interval {lower = (border (2*n+1) RoundUp), upper = (border (2*n) RoundDown)}
          )
 				
     exp x = limit (\s->
-             let r = (rounding s == RoundDown)
-                 n = precision s
-                 y = approximate x (prec RoundDown n)
-                 l = lower y
-                 u = upper y
-                 b 0 t r' = app_fromInteger s 1
-                 b k t r' = app_add s' (b (k-1) t r') (app_div s' (app_power s' t k) (app_fromInteger (anti s') (product [1..(toInteger k)])))
-                     where s' = prec r' n
-             in case r of
-                 True -> Interval{lower = b n l RoundDown, upper = b n u RoundUp}
-                 False -> Interval{lower = b n u RoundUp, upper = b n l RoundDown}
-		     )
-             
-    log x =
-     let c = compare x 0
-     in case c of
-         LT -> error "Not defined"
-         GT -> limit (\s ->
-                let c' = compare x 2 
-                in case c' of
-                    LT -> let r = (rounding s == RoundDown)
-                              n = precision s
-                              y = approximate x (prec RoundDown n)
-                              l = lower y
-                              u = upper y
-                              b 0 t r' = zero
-                              b k t r' = app_add s' (b (k-1) t r') (app_div s' (app_mul s' (app_power s' (app_add s' t (app_fromInteger s' (-1))) k) (app_power s' (app_fromInteger s' (-1)) (k+1))) (app_fromInteger s' (toInteger k)))
-                                  where s' = prec r' n
-                          in case r of
-                              True -> Interval{lower = b n l RoundDown, upper = b n u RoundUp}
-                              False -> Interval{lower = b n u RoundUp, upper = b n l RoundDown}
-                    GT -> let r = (rounding s == RoundDown)
-                              n = precision s
-                              y = approximate x (prec RoundDown n)
-                              l = lower y
-                              u = upper y
-                              b 0 t r' = zero
-                              b k t r' = app_add s' (b (k-1) t r') (app_div s' (app_power s' (app_fromInteger s' (-1)) (k+1)) (app_mul s' (app_fromInteger s' (toInteger k)) (app_power s' (app_add s' t (app_fromInteger s' (-1))) k)))
-                                  where s' = prec r' n
-                          in case r of
-                              True -> iadd s (Interval{lower = b n l RoundDown, upper = b n u RoundUp}) (approx (log (x-1)) (prec RoundDown n))
-                              False -> iadd s (Interval{lower = b n u RoundUp, upper = b n l RoundDown}) (approx (log (x-1)) (prec RoundDown n))
-               )
-
-    sin x = limit (\s ->
-              let r = (rounding s == RoundDown)
-                  n = precision s
-                  y = approximate x (prec RoundDown n)
-                  l = lower y
-                  u = upper y
-                  b 0 t r' = t
-                  b k t r' = app_add s' (b (k-1) t r') (app_mul s' (app_power s' (app_fromInteger s' (-1)) k) (app_div s' (app_power s' t (2*k+1)) (app_fromInteger s' (product [1..(toInteger (2*k+1))]))))
-                     where s' = prec r' n
-              in case r of
-                  True -> Interval{lower = b n l RoundDown, upper = b n u RoundUp}
-                  False -> Interval{lower = b n u RoundUp, upper = b n l RoundDown}
-            )
-
-    cos x = limit (\s ->
-              let r = (rounding s == RoundDown)
-                  n = precision s
-                  y = approximate x (prec RoundDown n)
-                  l = lower y
-                  u = upper y
-                  b 0 t r' = app_fromInteger s 1
-                  b k t r' = app_add s' (b (k-1) t r') (app_mul s' (app_power s' (app_fromInteger s' (-1)) k) (app_div s' (app_power s' t (2*k)) (app_fromInteger s' (product [1..(toInteger (2*k))]))))
-                     where s' = prec r' n
-              in case r of
-                  True -> Interval{lower = b n l RoundDown, upper = b n u RoundUp}
-                  False -> Interval{lower = b n u RoundUp, upper = b n l RoundDown}
-            )
-
-    sinh x = limit (\s ->
-              let r = (rounding s == RoundDown)
-                  n = precision s
-                  y = approximate x (prec RoundDown n)
-                  l = lower y
-                  u = upper y
-                  b 0 t r' = t
-                  b k t r' = app_add s' (b (k-1) t r') (app_div s' (app_power s' t (2*k+1)) (app_fromInteger s' (product [1..(toInteger (2*k+1))])))
-                     where s' = prec r' n
-              in case r of
-                  True -> Interval{lower = b n l RoundDown, upper = b n u RoundUp}
-                  False -> Interval{lower = b n u RoundUp, upper = b n l RoundDown}
-            )
-
-    cosh x  = limit (\s -> -- Problem v okolici ničle
-              let r = (rounding s == RoundDown)
-                  n = precision s
-                  y = approximate x (prec RoundDown n)
-                  l = lower y
-                  u = upper y
-                  b 0 t r' = t
-                  b k t r' = app_add s' (b (k-1) t r') (app_div s' (app_power s' t (2*k)) (app_fromInteger s' (product [1..(toInteger (2*k))])))
-                     where s' = prec r' n
-              in case r of
-                  True -> Interval{lower = b n l RoundDown, upper = b n u RoundUp}
-                  False -> Interval{lower = b n u RoundUp, upper = b n l RoundDown}
-            )
-
-    asinh x = --še ne dela, verjetno napaka v b k t r'
+                 let r = rounding s 
+                     n = precision s					 
+                     border h k m = let t = case m of
+                                              0 -> toRational' (lower (approximate x (prec RoundDown h)))
+                                              1 -> toRational' (upper (approximate x (prec RoundDown h)))
+                                        h' = toRational h											  
+                                        serie = sum [t^(tI i)/(fac i)|i <- [0..h']]
+                                        reminder = abs $ t^((tI h')+1)/fac (h'+1) 
+                                    in case m of
+                                              0 -> let part = serie - reminder
+                                                   in case signum part == -1 of
+                                                       True -> app_fromRational (prec RoundUp k) part
+                                                       False -> app_fromRational (prec RoundDown k) part
+                                              1 -> let part = serie + reminder
+                                                   in case signum part == -1 of
+                                                       True -> app_fromRational (prec RoundDown k) part
+                                                       False -> app_fromRational (prec RoundUp k) part										  
+                 in case r of			 
+                     RoundDown -> Interval {lower = maximum [border i (2*n-1) 0| i <- [1,3..(2*n-1)]], upper = minimum [border i (2*n-1) 1| i <- [1,3..(2*n-1)]]}
+                     RoundUp -> Interval {lower = minimum [border i (2*n-1) 1| i <- [1,3..(2*n-1)]], upper = maximum [border i (2*n-1) 0| i <- [1,3..(2*n-1)]]}   
+			  )	
+    log x = error "Not implemented" -- x ga omeji 
+    sin x = error "Not implemented"-- 1 ga omeji
+    cos x = error "Not implemented"-- 1 ga omeji
+    sinh x = error "Not implemented"--problem
+    cosh x  = error "Not implemented"--problem
+	
+    asinh x =
      let c = compare (abs x) 1
      in case c of
          GT -> error "Out of the radious of convergence"
-         LT -> limit (\s ->
-                let r = (rounding s == RoundDown)
-                    n = precision s
-                    y = approximate x (prec RoundDown n)
-                    l = lower y
-                    u = upper y
-                    b 0 t r' = t
-                    b k t r' = app_add s' (b (k-1) t r') (app_div s' (app_mul s' (app_power s' (app_fromInteger s' (-1)) k) (app_fromInteger s' (product [1..(toInteger (2*k))]))) (app_mul s' (app_power s' (app_fromInteger s' 2) (2*k)) (app_mul s' (app_power s' (app_fromInteger s' (product [1..(toInteger k)])) 2) (app_fromInteger s' (toInteger (2*k+1))))))
-                        where s' = prec r' n
-                in case r of
-                    True -> Interval{lower = b n l RoundDown, upper = b n u RoundUp}
-                    False -> Interval{lower = b n u RoundUp, upper = b n l RoundDown}
-               )
+         LT -> limit (\s->
+                 let r = rounding s 
+                     n = precision s					 
+                     border h k m = let t = case m of
+                                              0 -> toRational' (lower (approximate x (prec RoundDown h)))
+                                              1 -> toRational' (upper (approximate x (prec RoundDown h)))
+                                        h' = toRational h											  
+                                        serie = sum [(-1)^(tI i)*(fac (2*i))*t^(2*(tI i)+1)/(2^(2*(tI i))*(fac i)^2*(2*i+1))|i <- [0..h']]
+                                        reminder = abs $ t^((tI h')+1)/fac (h'+1)
+                                    in case m of
+                                              0 -> let part = serie - reminder
+                                                   in case signum part == -1 of
+                                                       True -> app_fromRational (prec RoundUp k) part
+                                                       False -> app_fromRational (prec RoundDown k) part
+                                              1 -> let part = serie + reminder
+                                                   in case signum part == -1 of
+                                                       True -> app_fromRational (prec RoundDown k) part
+                                                       False -> app_fromRational (prec RoundUp k) part										  
+                 in case r of 
+                     RoundDown -> Interval {lower = maximum [border i (2*n) 0| i <- [2,4..(2*n)]], upper = minimum [border i (2*n) 1| i <- [2,4..(2*n)]]}
+                     RoundUp -> Interval {lower = minimum [border i (2*n) 1| i <- [2,4..(2*n)]], upper = maximum [border i (2*n) 0| i <- [2,4..(2*n)]]}   
+			  )
+
 
     acosh x = error "Not implemented"
     atanh x = 
      let c = compare (abs x) 1
      in case c of
          GT -> error "Out of the radious of convergence"
-         LT -> limit (\s ->
-                let r = (rounding s == RoundDown)
-                    n = precision s
-                    y = approximate x (prec RoundDown n)
-                    l = lower y
-                    u = upper y
-                    b 0 t r' = t
-                    b k t r' = app_add s' (b (k-1) t r') (app_div s' (app_power s' t (2*k+1)) (app_fromInteger s' (toInteger (2*k+1))))
-                        where s' = prec r' n
-                in case r of
-                    True -> Interval{lower = b n l RoundDown, upper = b n u RoundUp}
-                    False -> Interval{lower = b n u RoundUp, upper = b n l RoundDown}
-               )
+         LT -> limit (\s->
+                 let r = rounding s 
+                     n = precision s					 
+                     border h k m = let t = case m of
+                                              0 -> toRational' (lower (approximate x (prec RoundDown h)))
+                                              1 -> toRational' (upper (approximate x (prec RoundDown h)))
+                                        h' = toRational h											  
+                                        serie = sum [t^(2*(tI i)+1)/(2*i+1)|i <- [0..h']]
+                                        reminder = abs $ t^((tI h')+1)/fac (h'+1)
+                                    in case m of
+                                              0 -> let part = serie - reminder
+                                                   in case signum part == -1 of
+                                                       True -> app_fromRational (prec RoundUp k) part
+                                                       False -> app_fromRational (prec RoundDown k) part
+                                              1 -> let part = serie + reminder
+                                                   in case signum part == -1 of
+                                                       True -> app_fromRational (prec RoundDown k) part
+                                                       False -> app_fromRational (prec RoundUp k) part										  
+                 in case r of			 
+                     RoundDown -> Interval {lower = maximum [border i (2*n) 0| i <- [2,4..(2*n)]], upper = minimum [border i (2*n) 1| i <- [2,4..(2*n)]]}
+                     RoundUp -> Interval {lower = minimum [border i (2*n) 1| i <- [2,4..(2*n)]], upper = maximum [border i (2*n) 0| i <- [2,4..(2*n)]]}   
+			  )	
