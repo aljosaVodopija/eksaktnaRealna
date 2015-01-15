@@ -200,31 +200,60 @@ instance IntervalDomain q => Floating (RealNum q) where
 				
     exp x = limit (\s->
                  let r = rounding s 
-                     n = precision s					 
+                     n = precision s
                      border h k m = let t = case m of
                                               0 -> toRational' (lower (approximate x (prec RoundDown h)))
                                               1 -> toRational' (upper (approximate x (prec RoundDown h)))
                                         h' = toRational h											  
                                         serie = sum [t^(tI i)/(fac i)|i <- [0..h']]
-                                        reminder = abs $ t^((tI h')+1)/fac (h'+1) 
+                                        reminder = case signum t == -1 of
+                                                   True -> abs $ t^((tI h')+1)/fac (h'+1)
+                                                   False -> abs $ 3^(floor t)*t^((tI h')+1)/fac (h'+1)                                                   
                                     in case m of
                                               0 -> let part = serie - reminder
                                                    in case signum part == -1 of
-                                                       True -> app_fromRational (prec RoundUp k) part
-                                                       False -> app_fromRational (prec RoundDown k) part
+                                                       True -> app_fromRational (prec RoundUp (2*n)) part
+                                                       False -> app_fromRational (prec RoundDown (2*n)) part
                                               1 -> let part = serie + reminder
                                                    in case signum part == -1 of
-                                                       True -> app_fromRational (prec RoundDown k) part
-                                                       False -> app_fromRational (prec RoundUp k) part										  
-                 in case r of			 
-                     RoundDown -> Interval {lower = maximum [border i (2*n-1) 0| i <- [1,3..(2*n-1)]], upper = minimum [border i (2*n-1) 1| i <- [1,3..(2*n-1)]]}
-                     RoundUp -> Interval {lower = minimum [border i (2*n-1) 1| i <- [1,3..(2*n-1)]], upper = maximum [border i (2*n-1) 0| i <- [1,3..(2*n-1)]]}   
+                                                       True -> app_fromRational (prec RoundDown (2*n)) part
+                                                       False -> app_fromRational (prec RoundUp (2*n)) part										  
+                 in case n==0 of			 
+                     False -> Interval {lower = maximum [border i (2*n-1) 0| i <- [1,3..(2*n-1)]], upper = minimum [border i (2*n-1) 1| i <- [1,3..(2*n-1)]]}
+                     --RoundUp -> Interval {lower = minimum [border i (2*n-1) 1| i <- [1,3..(2*n-1)]], upper = maximum [border i (2*n-1) 0| i <- [1,3..(2*n-1)]]}
+                     True -> Interval {lower = app_fromInteger s 10, upper = app_fromInteger s 10}                     
 			  )	
     log x = error "Not implemented" -- x ga omeji 
+    cos x = limit (\s->
+                 let r = rounding s 
+                     n = precision s
+                     y = width (approximate x s)
+                     border h k m = let t = case m of
+                                              0 -> toRational' (lower (approximate x (prec RoundDown h)))
+                                              1 -> toRational' (upper (approximate x (prec RoundDown h)))
+                                        h' = toRational h											  
+                                        serie = sum [t^(tI i)/(fac i)|i <- [0..h']]
+                                        reminder = case signum t == -1 of
+                                                   True -> abs $ t^((tI h')+1)/fac (h'+1)
+                                                   False -> abs $ 3^(floor t)*t^((tI h')+1)/fac (h'+1)                                                   
+                                    in case m of
+                                              0 -> let part = serie - reminder
+                                                   in case signum part == -1 of
+                                                       True -> app_fromRational (prec RoundUp (2*n)) part
+                                                       False -> app_fromRational (prec RoundDown (2*n)) part
+                                              1 -> let part = serie + reminder
+                                                   in case signum part == -1 of
+                                                       True -> app_fromRational (prec RoundDown (2*n)) part
+                                                       False -> app_fromRational (prec RoundUp (2*n)) part										  
+                 in case (r==RoundDown,n==0) of			 
+                     (True,False) -> Interval {lower = maximum [border i (2*n-1) 0| i <- [1,3..(2*n-1)]], upper = minimum [border i (2*n-1) 1| i <- [1,3..(2*n-1)]]}
+                     --RoundUp -> Interval {lower = minimum [border i (2*n-1) 1| i <- [1,3..(2*n-1)]], upper = maximum [border i (2*n-1) 0| i <- [1,3..(2*n-1)]]}
+                     (True,True) -> Interval {lower = app_fromInteger s 10, upper = app_fromInteger s 10}
+                     (False,_) -> Interval {lower = app_fromInteger s 10, upper = app_fromInteger s 10}
+			  )	
     sin x = error "Not implemented"-- 1 ga omeji
-    cos x = error "Not implemented"-- 1 ga omeji
-    sinh x = error "Not implemented"--problem
-    cosh x  = error "Not implemented"--problem
+    sinh x = (exp (x) - exp (-x))/2
+    cosh x = (exp (x) + exp (-x))/2
 	
     asinh x =
      let c = compare (abs x) 1
