@@ -56,15 +56,13 @@ class (Show q, Ord q) => ApproximateField q where
   app_signum :: Stage -> q -> q
   app_fromInteger :: Stage -> Integer -> q
   app_shift :: Stage -> q -> Int -> q -- ^ shift by a power of 2
-  app_power :: Stage -> q -> Int -> q
   app_fromRational :: Stage -> Rational -> q
   
   app_fromRational s r = case signum r of
-							0 -> zero 
-							1 -> app_div s (app_fromInteger s (numerator r)) (app_fromInteger (anti s) (denominator r))
-							-1 -> app_div s' (app_fromInteger s' (numerator r)) (app_fromInteger (anti s') (denominator r))
-							     where s' = anti s
-
+                            1 -> app_div s (app_fromInteger s (numerator r)) (app_fromInteger (anti s) (denominator r))
+                            0 -> zero
+                            -1 -> app_negate s (app_div (anti s) (app_fromInteger (anti s) (numerator (abs r))) (app_fromInteger s (denominator (abs r))))
+							
 -- | A dyadic number is of the form @m * 2^e@ where @m@ is the /mantissa/ and @e@ is the /exponent/.
 data Dyadic = Dyadic { mant :: Integer, expo :: Int }
             | PositiveInfinity
@@ -220,8 +218,8 @@ instance ApproximateField Dyadic where
       where shift_with_round r k x =
                        let y = shiftR x k
                        in case r of
-                         RoundDown -> if signum y > 0 then y else succ y
-                         RoundUp -> if signum y > 0 then succ y else y
+                         RoundDown -> y
+                         RoundUp -> succ y
 
   size NaN = 0
   size PositiveInfinity = 0
@@ -291,7 +289,6 @@ instance ApproximateField Dyadic where
   app_shift s PositiveInfinity k = PositiveInfinity
   app_shift s NegativeInfinity k = NegativeInfinity
   app_shift s Dyadic {mant=m, expo=e} k = normalize s (Dyadic {mant = m, expo = e + k})
-  
-  app_power s x n = normalize s x^n -- definirat za nan pozitive infty...
- 
+
   toRational' Dyadic {mant=m, expo=e} = if signum e == -1 then (toRational m)/2^(-e) else (toRational m)*2^e
+  
