@@ -260,27 +260,29 @@ instance IntervalDomain q => Floating (RealNum q) where
                      q1 = toRational' (lower (approximate x (prec r 0)))
                      q2 = toRational' (upper (approximate x (prec r 0)))
                      m = ceiling (maximum [abs q1, abs q2])
-                     v = loop 1 
+                     m' = toRational m
+                     v = loop (n+m)  
                           where loop p = let m1 = (3^m)/2^(p+1) 
                                          in case m1 < 1/2^n of
                                               True -> p
                                               False -> loop (p+1)
-                     u = loop 1
-                          where loop p = let m1 = 2^n*(3^m+1)*(toRational m)^(2*(tI p)+2)
+                     u = loop m'
+                          where loop p = let m1 = 2^n*(3^m+1)*m'^(2*(tI p)+2)
                                              m2 = 2*(fac (2*p+2)) 
-                                         in case p >= (toRational m) && m2 >= m1 of
+                                         in case m2 >= m1 of
                                               True -> p
                                               False -> loop (p+1)
                      serie t = sum [(-1)^(tI i)*t^(2*(tI i))/(fac (2*i))|i <- [0..u]]
                      k = maximum [snd (approx_to x v), n]
                      x1 = toRational' (lower (approximate x (prec r k)))
                      x2 = toRational' (upper (approximate x (prec r k)))
-                     reminder = if n > 0 then (1/2^(n-1)) else 2
+                     reminder = if n > 0 then 1/2^(n-1) else 2
                      s' = prec r k
                      part1 = app_fromRational s' ((serie x1) - sig*reminder)
                      part2 = app_fromRational (anti s') ((serie x2) + sig*reminder)
                  in Interval {lower = part1, upper = part2}
-             )    
+             ) 
+             
     sin x = limit (\s->
                  let r = rounding s 
                      n = precision s
@@ -288,27 +290,29 @@ instance IntervalDomain q => Floating (RealNum q) where
                      q1 = toRational' (lower (approximate x (prec r 0)))
                      q2 = toRational' (upper (approximate x (prec r 0)))
                      m = ceiling (maximum [abs q1, abs q2])
-                     v = loop 1 
+                     m' = toRational m
+                     v = loop (n+m) 
                           where loop p = let m1 = (3^m+1)/2^(p+1) 
                                          in case m1 < 1/2^n of
                                               True -> p
                                               False -> loop (p+1)
-                     u = loop 1
-                          where loop p = let m1 = 2^n*(3^m+1)*(toRational m)^(2*(tI p)+3)
+                     u = loop m'
+                          where loop p = let m1 = 2^n*(3^m+1)*m'^(2*(tI p)+3)
                                              m2 = 2*(fac (2*p+3)) 
-                                         in case p >= (toRational m) && m2 >= m1 of
+                                         in case m2 >= m1 of
                                               True -> p
                                               False -> loop (p+1)
                      serie t = sum [(-1)^(tI i)*t^(2*(tI i)+1)/(fac (2*i+1))|i <- [0..u]]
                      k = maximum [snd (approx_to x v), n]
                      x1 = toRational' (lower (approximate x (prec r k)))
                      x2 = toRational' (upper (approximate x (prec r k)))
-                     reminder = if n > 0 then (1/2^(n-1)) else 2
+                     reminder = if n > 0 then 1/2^(n-1) else 2
                      s' = prec r k
                      part1 = app_fromRational s' ((serie x1) - sig*reminder)
                      part2 = app_fromRational (anti s') ((serie x2) + sig*reminder)
                  in Interval {lower = part1, upper = part2}
              )    
+
     acosh x = error "Not implemented"
     atanh x = error "Not implemented"
     log x = error "Not implemented" 
