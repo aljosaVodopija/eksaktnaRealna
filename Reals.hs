@@ -155,12 +155,13 @@ lim x =
 -- that we can compute arbitrarily good @q@-approximations to real numbers. The
 -- function 'approx_to x k' computes an approximation @a@ of type @q@ which is within
 -- @2^-k@ of @x@.
-approx_to :: IntervalDomain q => RealNum q -> Int -> q
+approx_to :: IntervalDomain q => RealNum q -> Int -> (q,Int)
 approx_to x k = loop 0
                 where loop n = let i = approximate x (prec RoundDown n)
-                               in case (toReal (width i)) < 1/2^(k+1) of 
-                                    True -> midpoint (lower i) (upper i)
-                                    False -> loop $ n+1
+                                   q = if k > 0 then 1/2^(k-1) else 2
+                               in case toRational' (width i) < q of 
+                                    True -> (midpoint (lower i) (upper i), n)
+                                    False -> loop $ n+10
 
       {- There are several possibilities for optimization. Here we describe one. Let
        @a_n@ be the midpoint of the interval @approximate x (prec RoundDown n)@ and
@@ -171,14 +172,6 @@ approx_to x k = loop 0
        we try something else. The drawback is that we might end up over-estimating
        the needed precision @n@. -}
 
--- | This function is approx_to for @RealNum Dyadic@. Is faster than normal. 
-approx_to_dyadic :: RealNum Dyadic -> Int -> Dyadic
-approx_to_dyadic x k = loop 0
-                where loop n = let i = approximate x (prec RoundDown n)
-                                   q = Dyadic {mant = 1, expo= -(k+1)}  
-                               in case (width i) < q of 
-                                    True -> midpoint (lower i) (upper i)
-                                    False -> loop $ n+1
 fac :: Rational -> Rational
 fac n = product [1..n]
 
@@ -240,29 +233,82 @@ instance IntervalDomain q => Floating (RealNum q) where
                      RoundDown -> Interval {lower = maximum [border i (2*n) (-1)| i <- [0,2..(2*n)]], upper = minimum [border i (2*n) 1| i <- [0,2..(2*n)]]}
                      RoundUp -> Interval {lower = minimum [border i (2*n) 1| i <- [0,2..(2*n)]], upper = maximum [border i (2*n) (-1)| i <- [0,2..(2*n)]]}                     
               ) 
-    
-    asinh x = 
-     limit (\s->
-         let r = rounding s 
-             n = precision s
-             border h k m = let (t,r') = case m of
-                                      -1 -> (toRational' (lower (approximate x (prec RoundDown h))),RoundDown)
-                                      1 -> (toRational' (upper (approximate x (prec RoundDown h))),RoundUp)
-                                h' = toRational h                                             
-                                (serie,reminder) = case (t >= 1,t <= -1) of
-                                         (False,False) -> (sum [(-1)^(tI i)*(fac (2*i))*t^(2*(tI i)+1)/(2^(2*(tI i))*(fac i)^2*(2*i+1))|i <- [0..h']],
-                                                           abs $ 1/(1-(abs t))*(abs t)^(2*(tI h')+2))
-                                         (True,False) -> (1,0)
-                                         (False,True) -> ((-1),0)
-                                part = serie + m*reminder
-                            in app_fromRational (prec r' k) part                                      
-         in case r of 
-             RoundDown -> Interval {lower = maximum [border i (2*n) (-1)| i <- [0,2..(2*n)]], upper = minimum [border i (2*n) 1| i <- [0,2..(2*n)]]}
-             RoundUp -> Interval {lower = minimum [border i (2*n) 1| i <- [0,2..(2*n)]], upper = maximum [border i (2*n) (-1)| i <- [0,2..(2*n)]]}   
-     )
+  
+    asinh x = limit (\s->
+                 let r = rounding s 
+                     n = precision s
+                     border h k m = let (t,r') = case m of
+                                              -1 -> (toRational' (lower (approximate x (prec RoundDown h))),RoundDown)
+                                              1 -> (toRational' (upper (approximate x (prec RoundDown h))),RoundUp)
+                                        h' = toRational h                                             
+                                        (serie,reminder) = case (t >= 1,t <= -1) of
+                                                 (False,False) -> (sum [(-1)^(tI i)*(fac (2*i))*t^(2*(tI i)+1)/(2^(2*(tI i))*(fac i)^2*(2*i+1))|i <- [0..h']],
+                                                                   abs $ 1/(1-(abs t))*(abs t)^(2*(tI h')+2))
+                                                 (True,False) -> (1,0)
+                                                 (False,True) -> ((-1),0)
+                                        part = serie + m*reminder
+                                    in app_fromRational (prec r' k) part                                      
+                 in case r of 
+                     RoundDown -> Interval {lower = maximum [border i (2*n) (-1)| i <- [0,2..(2*n)]], upper = minimum [border i (2*n) 1| i <- [0,2..(2*n)]]}
+                     RoundUp -> Interval {lower = minimum [border i (2*n) 1| i <- [0,2..(2*n)]], upper = maximum [border i (2*n) (-1)| i <- [0,2..(2*n)]]}   
+              )
 
-    cos x = error "Not implemented"
-    sin x = error "Not implemented"
+    cos x = limit (\s->
+                 let r = rounding s 
+                     n = precision s
+                     sig = if r == RoundDown then 1 else (-1) 
+                     q1 = toRational' (lower (approximate x (prec r 0)))
+                     q2 = toRational' (upper (approximate x (prec r 0)))
+                     m = ceiling (maximum [abs q1, abs q2])
+                     v = loop 1 
+                          where loop p = let m1 = (3^m)/2^(p+1) 
+                                         in case m1 < 1/2^n of
+                                              True -> p
+                                              False -> loop (p+1)
+                     u = loop 1
+                          where loop p = let m1 = 2^n*(3^m+1)*(toRational m)^(2*(tI p)+2)
+                                             m2 = 2*(fac (2*p+2)) 
+                                         in case p >= (toRational m) && m2 >= m1 of
+                                              True -> p
+                                              False -> loop (p+1)
+                     serie t = sum [(-1)^(tI i)*t^(2*(tI i))/(fac (2*i))|i <- [0..u]]
+                     k = maximum [snd (approx_to x v), n]
+                     x1 = toRational' (lower (approximate x (prec r k)))
+                     x2 = toRational' (upper (approximate x (prec r k)))
+                     reminder = if n > 0 then (1/2^(n-1)) else 2
+                     s' = prec r k
+                     part1 = app_fromRational s' ((serie x1) - sig*reminder)
+                     part2 = app_fromRational (anti s') ((serie x2) + sig*reminder)
+                 in Interval {lower = part1, upper = part2}
+             )    
+    sin x = limit (\s->
+                 let r = rounding s 
+                     n = precision s
+                     sig = if r == RoundDown then 1 else (-1) 
+                     q1 = toRational' (lower (approximate x (prec r 0)))
+                     q2 = toRational' (upper (approximate x (prec r 0)))
+                     m = ceiling (maximum [abs q1, abs q2])
+                     v = loop 1 
+                          where loop p = let m1 = (3^m+1)/2^(p+1) 
+                                         in case m1 < 1/2^n of
+                                              True -> p
+                                              False -> loop (p+1)
+                     u = loop 1
+                          where loop p = let m1 = 2^n*(3^m+1)*(toRational m)^(2*(tI p)+3)
+                                             m2 = 2*(fac (2*p+3)) 
+                                         in case p >= (toRational m) && m2 >= m1 of
+                                              True -> p
+                                              False -> loop (p+1)
+                     serie t = sum [(-1)^(tI i)*t^(2*(tI i)+1)/(fac (2*i+1))|i <- [0..u]]
+                     k = maximum [snd (approx_to x v), n]
+                     x1 = toRational' (lower (approximate x (prec r k)))
+                     x2 = toRational' (upper (approximate x (prec r k)))
+                     reminder = if n > 0 then (1/2^(n-1)) else 2
+                     s' = prec r k
+                     part1 = app_fromRational s' ((serie x1) - sig*reminder)
+                     part2 = app_fromRational (anti s') ((serie x2) + sig*reminder)
+                 in Interval {lower = part1, upper = part2}
+             )    
     acosh x = error "Not implemented"
     atanh x = error "Not implemented"
-    log x = error "Not implemented"
+    log x = error "Not implemented" 
