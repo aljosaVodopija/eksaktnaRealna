@@ -6,7 +6,7 @@ Za uporabo je treba paket namestiti s programom Cabal.
 
 ## Realna števila
 Realna števila so reprezentirana kot presek padajoče verige intervalov diadičih števil. Enako število ima lahko različne reprezentacije.
-### Osnovne operacije na realnih številih:
+### Osnovne operacije na realnih številih
 ```
 *Reals> let a=exact 1.3
 *Reals> a*(1-a)
