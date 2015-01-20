@@ -13,14 +13,16 @@ Realna števila so reprezentirana kot presek padajoče verige intervalov diadič
 [-1635786*2^-22,-1635768*2^-22] -0.3899996280670166
 *Reals> a^200
 [1705561*2^55,1706556*2^55] 6.146723539897814e22
+"ghci> " exact 2.2 < exact 2.7
+True
 ```
 ### Funkciji `apart` in `equal`
-Realna števila tvorijo Hausdorffov prostor, zato lahko definiramo funkcijo `apart`, ki za dve števili preveri ali sta različni. Posledično funkcija `apart` za dve enaki točki ne zna določiti ali sta različni.
+Realna števila tvorijo Hausdorffov prostor, zato lahko definiramo funkcijo `apart`, ki za dve števili preveri ali sta različni. 
 ```
 *Reals> sin (exact 0) `apart` cos (exact 0)
 True
 ```
-Realna števila niso diskreten prostor, zato ne moremo definirati funkcije `equal`, ki bi preverila ali sta dve števili enaki.
+Realna števila niso diskreten prostor, zato ne moremo definirati funkcije `equal`, ki bi preverila ali sta dve števili enaki. Posledično funkcija `apart` za dve enaki točki ne zna določiti ali sta različni.
 ### Funkciji `forall` in `exists`
 Zaprti intervali so kompaktne množice. Posledično lahko definiramo funkcijo `forall`, ki nam preveri veljavnost predikata na zaprtih intervalih. 
 
@@ -34,14 +36,14 @@ True
 False
 ```
 ### Naprednejše funkcije
-Implementirana je funkcija `approx_to`, ki za dano realno število vrne pripadajoče diadično število na natančnost 2^(-k).
+Implementirana je funkcija `approx_to`, ki za dano realno število vrne približek v obliki diadičnega števila na natančnost 2^(-k).
 ```
 *Reals> approx_to (exact 2/3) 60 RoundDown
 (3074457345618258602*2^-62,60)
 *Reals> 3074457345618258602/2^62
 0.6666666666666666
 ```
-Definirana je funkcija `lim`, ki za dano konvergentno zaporedje izračuna njegovo limito.
+Definirana je funkcija `lim`, ki za dano konvergentno zaporedje izračuna njegovo limito. 
 ```
 *Reals> let x k = (exact (1.2+1/2^k), Dyadic{mant=1, expo= -k})
 *Reals> lim x
@@ -68,7 +70,7 @@ V instanci `Floating` so definirane funkcije `exp`, `log`, `sin`, `cos`, ... in 
 -1.5274985276366035
 ```
 ## Cela števila
-Cela števila z diskretno topologijo tvorijo Hausdorffov prostor. Kompakti v celih številih so končne podmnožice.
+Cela števila z diskretno topologijo tvorijo diskreten, Hausdorffov prostor. Zato lahko na celih številih implementiramo tako funkcijo `apart` kot `equal`. Kompakti na celih številih so končne podmnožice, za katere lahko tako definiramo `forall`.
 ```
 *Integers> 42 `equal` 42
 True
