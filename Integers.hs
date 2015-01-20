@@ -1,14 +1,14 @@
 {-# LANGUAGE TypeSynonymInstances, MultiParamTypeClasses, FlexibleInstances #-}
 
+{- | Integers (Z) with discrete topology form a LinearOrder, Discrete, Hausdorff, Overt space.
+   Compact subspaces are finite sets.
+-}
+
 module Integers where
 
 import Staged
 import Space
 import Searchable
-
--- | Integers (Z) with discrete topology form a 
--- | LinearOrder, Discrete, Hausdorff, Overt space
--- | Compact subspaces are finite sets 
  
 -- | Linear order on integers
 instance LinearOrder Integer where

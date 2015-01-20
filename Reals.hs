@@ -102,8 +102,8 @@ instance IntervalDomain q => Overt (ClosedInterval q) (RealNum q) where
        let r = rounding s
            n = precision s
            test_interval u v = case r of
-                                 RoundUp -> Interval {lower = v, upper = u}
-                                 RoundDown   -> let w = midpoint u v in Interval {lower = w, upper = w}
+                                 RoundUp   -> Interval {lower = v, upper = u}
+                                 RoundDown -> let w = midpoint u v in Interval {lower = w, upper = w}
            sweep [] = False
            sweep ((k,a,b):lst) = let x = return $ test_interval a b
                                     in case (r, approximate (p x) (prec r k)) of
@@ -141,13 +141,13 @@ lim x =
      limit (\s -> 
         let r = rounding s
             n = precision s
-            border_lo i j = app_sub s' (lower (approximate (fst $ x i) s')) (snd $ x i)
-                where s' = prec RoundDown j 
-            border_up i j = app_add s' (upper (approximate (fst $ x i) s')) (snd $ x i)
-                where s' = prec RoundUp j
+            border_lower i j = app_sub s' (lower (approximate (fst $ x i) s')) (snd $ x i)
+                where s' = prec_down j 
+            border_upper i j = app_add s' (upper (approximate (fst $ x i) s')) (snd $ x i)
+                where s' = prec_up j
         in case r of
-            RoundDown -> Interval {lower = maximum [border_lo i n | i <- [0..n]], upper = minimum [border_up i n | i <- [0..n]]}
-            RoundUp -> Interval {lower = minimum [border_up i n | i <- [0..n]], upper = maximum [border_lo i n | i <- [0..n]]}
+            RoundDown -> Interval {lower = maximum [border_lower i n | i <- [0..n]], upper = minimum [border_upper i n | i <- [0..n]]}
+            RoundUp   -> Interval {lower = minimum [border_upper i n | i <- [0..n]], upper = maximum [border_lower i n | i <- [0..n]]}
      )
      
 -- | Reals form an Archimedean field. Topologically speaking, this means that the
@@ -155,8 +155,7 @@ lim x =
 -- that we can compute arbitrarily good @q@-approximations to real numbers. The
 -- function 'approx_to x k r' computes an approximation @a@ of type @q@ which is within
 -- @2^-k@ of @x@.
-
-approx_to :: IntervalDomain q => RealNum q -> Int -> RoundingMode -> (q,Int)
+approx_to :: IntervalDomain q => RealNum q -> Int -> RoundingMode -> (q, Int)
 approx_to x k r = let r10 = toRational' (width (approximate x (prec r 10)))
                       r20 = toRational' (width (approximate x (prec r 20)))
                       n = case r20==0 of
@@ -172,15 +171,6 @@ approx_to x k r = let r10 = toRational' (width (approximate x (prec r 10)))
                                                in case toRational' (width i) < q of 
                                                    True -> (midpoint (lower i) (upper i), m)
                                                    False -> loop $ m+1
-                     
-      {- There are several possibilities for optimization. Here we describe one. Let
-       @a_n@ be the midpoint of the interval @approximate x (prec RoundDown n)@ and
-       let @r_n@ be its width. We are looking for @n@ such that @r_n < 2^{ -n-1}@.
-       One heuristic is to assume that @r_n@'s form a geometric series. From this we
-       can look at three terms of the sequence, say @r_10@, @r_20@, and @r_30@ and
-       estimate an @n@ which should give @r_n < 2^{ -n-1}@. If the estimate fails,
-       we try something else. The drawback is that we might end up over-estimating
-       the needed precision @n@. -}
 
 fac :: Rational -> Rational
 fac n = product [1..n]
@@ -201,19 +191,24 @@ ilogb b n | n < 0      = ilogb b (- n)
                               in if n < (b ^ av)
                                     then bin b lo av
                                     else bin b av hi
-                             
+
+-- | Instance floating for reals uses Taylor's series and error bounds. (Missing: Atanh, Atan, Acos, Acosh)
+-- Functions (Cos, Sin, Exp, Tan, Cosh, Sinh) makes good approximations in short time for elements inside 
+-- the interval (-30,30) and for integers. Log is defined for elements inside (0,2) and Asinh for elements 
+-- inside (-1,1).                                      
 instance IntervalDomain q => Floating (RealNum q) where
+
     pi = limit(\s -> 
              let r = rounding s
                  n = precision s
                  border k r'= let k' = toRational k
-                                  part_serie = 3 + 4 * (sum [ (-1)^((tI i)-1)/((2*i)*(2*i+1)*(2*i+2))|i <- [1..k']])
-                              in app_fromRational (prec r' k) part_serie
+                                  serie = 3 + 4 * (sum [ (-1)^((tI i)-1)/((2*i)*(2*i+1)*(2*i+2))|i <- [1..k']])
+                              in app_fromRational (prec r' k) serie
              in case r of
                  RoundDown -> Interval {lower = (border (2*n) RoundDown), upper = (border (2*n+1) RoundUp)}
-                 RoundUp -> Interval {lower = (border (2*n+1) RoundUp), upper = (border (2*n) RoundDown)}
+                 RoundUp   -> Interval {lower = (border (2*n+1) RoundUp), upper = (border (2*n) RoundDown)}
          )
-                
+         
     exp x = limit (\s->
                  let r = rounding s 
                      n = precision s + 4 
@@ -233,13 +228,13 @@ instance IntervalDomain q => Floating (RealNum q) where
                      k = maximum [snd (approx_to x v r), n]
                      x1 = toRational' (lower (approximate x (prec r k)))
                      x2 = toRational' (upper (approximate x (prec r k)))
-                     reminder = 1/2^(n-1)
+                     remainder = 1/2^(n-1)
                      s' = prec r k
-                     part1 = app_fromRational s' ((serie x1) - sig*reminder)
-                     part2 = app_fromRational (anti s') ((serie x2) + sig*reminder)
+                     part1 = app_fromRational s' ((serie x1) - sig*remainder)
+                     part2 = app_fromRational (anti s') ((serie x2) + sig*remainder)
                  in Interval {lower = part1, upper = part2}
-             )  
-
+             ) 
+             
     sinh x = ((exp x) - (exp (-x)))/2
 
     cosh x = ((exp x) + (exp (-x)))/2
@@ -251,16 +246,16 @@ instance IntervalDomain q => Floating (RealNum q) where
                                                   -1 -> (toRational' (lower (approximate x (prec_down h))), RoundDown)
                                                   1  -> (toRational' (upper (approximate x (prec_down h))), RoundUp)
                                         h' = toRational h                                             
-                                        (serie, reminder) = case (t >= 1,t <= -1) of
-                                                             (False, False) -> (sum [(-1)^(tI i)*(fac (2*i))*t^(2*(tI i)+1)/(2^(2*(tI i))*(fac i)^2*(2*i+1))|i <- [0..h']],
-                                                                               abs $ 1/(1-(abs t))*(abs t)^(2*(tI h')+2))
-                                                             (True, False)  -> (1,0)
-                                                             (False, True)  -> ((-1),0)
-                                        part = serie + m*reminder
+                                        (serie, remainder) = case (t >= 1,t <= -1) of
+                                                               (False, False) -> (sum [(-1)^(tI i)*(fac (2*i))*t^(2*(tI i)+1)/(2^(2*(tI i))*(fac i)^2*(2*i+1))|i <- [0..h']],
+                                                                                  abs $ 1/(1-(abs t))*(abs t)^(2*(tI h')+2))
+                                                               (True,  False) -> (1,0)
+                                                               (False, True)  -> ((-1),0)
+                                        part = serie + m*remainder
                                     in app_fromRational (prec r' k) part                                      
                  in case r of 
                      RoundDown -> Interval {lower = maximum [border i (2*n) (-1)| i <- [0,2..(2*n)]], upper = minimum [border i (2*n) 1| i <- [0,2..(2*n)]]}
-                     RoundUp -> Interval {lower = minimum [border i (2*n) 1| i <- [0,2..(2*n)]], upper = maximum [border i (2*n) (-1)| i <- [0,2..(2*n)]]}   
+                     RoundUp   -> Interval {lower = minimum [border i (2*n) 1| i <- [0,2..(2*n)]], upper = maximum [border i (2*n) (-1)| i <- [0,2..(2*n)]]}   
               )
 
     cos x = limit (\s->
@@ -282,10 +277,10 @@ instance IntervalDomain q => Floating (RealNum q) where
                      k = maximum [snd (approx_to x v r), n]
                      x1 = toRational' (lower (approximate x (prec r k)))
                      x2 = toRational' (upper (approximate x (prec r k)))
-                     reminder = 1/2^(n-1)
+                     remainder = 1/2^(n-1)
                      s' = prec r k
-                     part1 = app_fromRational s' ((serie x1) - sig*reminder)
-                     part2 = app_fromRational (anti s') ((serie x2) + sig*reminder)
+                     part1 = app_fromRational s' ((serie x1) - sig*remainder)
+                     part2 = app_fromRational (anti s') ((serie x2) + sig*remainder)
                  in Interval {lower = part1, upper = part2}
              ) 
              
@@ -308,15 +303,15 @@ instance IntervalDomain q => Floating (RealNum q) where
                      k = maximum [snd (approx_to x v r), n]
                      x1 = toRational' (lower (approximate x (prec r k)))
                      x2 = toRational' (upper (approximate x (prec r k)))
-                     reminder = 1/2^(n-1)
+                     remainder = 1/2^(n-1)
                      s' = prec r k
-                     part1 = app_fromRational s' ((serie x1) - sig*reminder)
-                     part2 = app_fromRational (anti s') ((serie x2) + sig*reminder)
+                     part1 = app_fromRational s' ((serie x1) - sig*remainder)
+                     part2 = app_fromRational (anti s') ((serie x2) + sig*remainder)
                  in Interval {lower = part1, upper = part2}
              )    
-
-    acosh x = error "Not implemented"
+             
     atanh x = (log (1+x) - log (1-x))/2
+
     log x = let b = compare x 0
             in case b of 
                 LT -> error "Not defined"
@@ -332,8 +327,8 @@ instance IntervalDomain q => Floating (RealNum q) where
                                                                              1 -> (toRational' (upper (approximate x (prec RoundDown h))),RoundUp)
                                                                   h' = toRational h                                                
                                                                   serie = -sum [(-1)^(tI i)*(-1+t)^(tI i)/i|i <- [1..h']]
-                                                                  reminder = 3^(ceiling (abs t))/2*(-1+t)^(tI h'+1)/(h'+1) 
-                                                                  part = serie + m*reminder                                                  
+                                                                  remainder = 3^(ceiling (abs t))/2*(-1+t)^(tI h'+1)/(h'+1) 
+                                                                  part = serie + m*remainder                                                  
                                                               in app_fromRational (prec r' k) part                                       
                                            in case r of            
                                                RoundDown -> Interval {lower = maximum [border i n (-1)| i <- [1..n]], upper = minimum [border i n 1| i <- [1..n]]}
@@ -347,8 +342,8 @@ instance IntervalDomain q => Floating (RealNum q) where
                                                                              1 -> (toRational' (upper (approximate x (prec RoundDown h))),RoundUp)
                                                                   h' = toRational h                                                
                                                                   serie = -sum [(-1)^(tI i)*(-1+t)^(tI i)/i|i <- [1..h']]
-                                                                  reminder = (-1+t)^(tI h'+1)/(h'+1) 
-                                                                  part = serie + m*reminder                                                  
+                                                                  remainder = (-1+t)^(tI h'+1)/(h'+1) 
+                                                                  part = serie + m*remainder                                                  
                                                               in app_fromRational (prec r' k) part                                       
                                            in case r of            
                                                RoundDown -> Interval {lower = maximum [border i n (-1)| i <- [1..n]], upper = minimum [border i n 1| i <- [1..n]]}
