@@ -153,24 +153,25 @@ lim x =
 -- | Reals form an Archimedean field. Topologically speaking, this means that the
 -- underlying approximate field @q@ is dense in the reals. Computationally this means
 -- that we can compute arbitrarily good @q@-approximations to real numbers. The
--- function 'approx_to x k' computes an approximation @a@ of type @q@ which is within
+-- function 'approx_to x k r' computes an approximation @a@ of type @q@ which is within
 -- @2^-k@ of @x@.
 
-approx_to :: IntervalDomain q => RealNum q -> Int -> (q,Int)
-approx_to x k = let r10 = toRational' (width (approximate x (prec_down 10)))
-                    r20 = toRational' (width (approximate x (prec_down 20)))
-                    a = ceiling (r10*r10/r20)
-                    n = (ilogb 2 a)+k
-                    i = approximate x (prec_down n)
-                    r = toRational' (width i)
-                    q = if k > 0 then 1/2^(k-1) else 2
-                in case r < q of
-                    True -> (midpoint (lower i) (upper i), n)
-                    False -> loop (n+10)
-                                where loop m = let i = approximate x (prec_down m)
+approx_to :: IntervalDomain q => RealNum q -> Int -> RoundingMode -> (q,Int)
+approx_to x k r = let r10 = toRational' (width (approximate x (prec r 10)))
+                      r20 = toRational' (width (approximate x (prec r 20)))
+                      n = case r20==0 of
+                            True -> 20
+                            False -> let a = ceiling (r10^2/r20)
+                                     in (ilogb 2 a)+k
+                      i = approximate x (prec r n)
+                      q = 2/2^k 
+                  in case toRational' (width i) < q of
+                      True -> (midpoint (lower i) (upper i), n)
+                      False -> loop (n+1)
+                                where loop m = let i = approximate x (prec r m)
                                                in case toRational' (width i) < q of 
                                                    True -> (midpoint (lower i) (upper i), m)
-                                                   False -> loop $ m+10
+                                                   False -> loop $ m+1
                      
       {- There are several possibilities for optimization. Here we describe one. Let
        @a_n@ be the midpoint of the interval @approximate x (prec RoundDown n)@ and
@@ -200,13 +201,6 @@ ilogb b n | n < 0      = ilogb b (- n)
                               in if n < (b ^ av)
                                     then bin b lo av
                                     else bin b av hi
- 
-u n m m'= loop m'
-          where loop p = let m1 = 2^n*(3^m+1)*m'^(2*(tI p)+3)
-                             m2 = 2*(fac (2*p+3)) 
-                         in case m2 >= m1 of
-                             True -> p
-                             False -> loop (p+1)
                              
 instance IntervalDomain q => Floating (RealNum q) where
     pi = limit(\s -> 
@@ -233,10 +227,10 @@ instance IntervalDomain q => Floating (RealNum q) where
                           where loop p = let m1 = 2^n*(3^m)*m'^((tI p)+1)
                                              m2 = fac (p+1) 
                                          in case m2 >= m1 of
-                                              True -> p
-                                              False -> loop (p+1)
+                                             True -> p
+                                             False -> loop (p+1)
                      serie t = sum [t^(tI i)/(fac i)|i <- [0..u]]
-                     k = maximum [snd (approx_to x v), n]
+                     k = maximum [snd (approx_to x v r), n]
                      x1 = toRational' (lower (approximate x (prec r k)))
                      x2 = toRational' (upper (approximate x (prec r k)))
                      reminder = 1/2^(n-1)
@@ -253,15 +247,15 @@ instance IntervalDomain q => Floating (RealNum q) where
     asinh x = limit (\s->
                  let r = rounding s 
                      n = precision s
-                     border h k m = let (t,r') = case m of
-                                              -1 -> (toRational' (lower (approximate x (prec RoundDown h))),RoundDown)
-                                              1 -> (toRational' (upper (approximate x (prec RoundDown h))),RoundUp)
+                     border h k m = let (t, r') = case m of
+                                                  -1 -> (toRational' (lower (approximate x (prec_down h))), RoundDown)
+                                                  1  -> (toRational' (upper (approximate x (prec_down h))), RoundUp)
                                         h' = toRational h                                             
-                                        (serie,reminder) = case (t >= 1,t <= -1) of
-                                                 (False,False) -> (sum [(-1)^(tI i)*(fac (2*i))*t^(2*(tI i)+1)/(2^(2*(tI i))*(fac i)^2*(2*i+1))|i <- [0..h']],
-                                                                   abs $ 1/(1-(abs t))*(abs t)^(2*(tI h')+2))
-                                                 (True,False) -> (1,0)
-                                                 (False,True) -> ((-1),0)
+                                        (serie, reminder) = case (t >= 1,t <= -1) of
+                                                             (False, False) -> (sum [(-1)^(tI i)*(fac (2*i))*t^(2*(tI i)+1)/(2^(2*(tI i))*(fac i)^2*(2*i+1))|i <- [0..h']],
+                                                                               abs $ 1/(1-(abs t))*(abs t)^(2*(tI h')+2))
+                                                             (True, False)  -> (1,0)
+                                                             (False, True)  -> ((-1),0)
                                         part = serie + m*reminder
                                     in app_fromRational (prec r' k) part                                      
                  in case r of 
@@ -277,15 +271,15 @@ instance IntervalDomain q => Floating (RealNum q) where
                      q2 = toRational' (upper (approximate x (prec r 4)))
                      m = ceiling (maximum [abs q1, abs q2])
                      m' = toRational m
-                     v = k + (ilogb 2 (3^m+1))  
+                     v = n + (ilogb 2 (3^m+1))  
                      u = loop m'
                           where loop p = let m1 = 2^n*(3^m+1)*m'^(2*(tI p)+2)
                                              m2 = 2*(fac (2*p+2)) 
                                          in case m2 >= m1 of
-                                              True -> p
-                                              False -> loop (p+1)
+                                             True -> p
+                                             False -> loop (p+1)
                      serie t = sum [(-1)^(tI i)*t^(2*(tI i))/(fac (2*i))|i <- [0..u]]
-                     k = maximum [snd (approx_to x v), n]
+                     k = maximum [snd (approx_to x v r), n]
                      x1 = toRational' (lower (approximate x (prec r k)))
                      x2 = toRational' (upper (approximate x (prec r k)))
                      reminder = 1/2^(n-1)
@@ -308,10 +302,10 @@ instance IntervalDomain q => Floating (RealNum q) where
                           where loop p = let m1 = 2^n*(3^m+1)*m'^(2*(tI p)+3)
                                              m2 = 2*(fac (2*p+3)) 
                                          in case m2 >= m1 of
-                                              True -> p
-                                              False -> loop (p+1)
+                                             True -> p
+                                             False -> loop (p+1)
                      serie t = sum [(-1)^(tI i)*t^(2*(tI i)+1)/(fac (2*i+1))|i <- [0..u]]
-                     k = maximum [snd (approx_to x v), n]
+                     k = maximum [snd (approx_to x v r), n]
                      x1 = toRational' (lower (approximate x (prec r k)))
                      x2 = toRational' (upper (approximate x (prec r k)))
                      reminder = 1/2^(n-1)

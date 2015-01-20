@@ -55,13 +55,11 @@ class (Show q, Ord q) => ApproximateField q where
   app_abs :: Stage -> q -> q
   app_signum :: Stage -> q -> q
   app_fromInteger :: Stage -> Integer -> q
+  app_fromInteger_ws :: Integer -> q
   app_shift :: Stage -> q -> Int -> q -- ^ shift by a power of 2
   app_fromRational :: Stage -> Rational -> q
   
-  app_fromRational s r = case signum r of
-                            1 -> app_div s (app_fromInteger s (numerator r)) (app_fromInteger (anti s) (denominator r))
-                            0 -> zero
-                            -1 -> app_negate s (app_div (anti s) (app_fromInteger (anti s) (numerator (abs r))) (app_fromInteger s (denominator (abs r))))
+  app_fromRational s r = app_div s (app_fromInteger_ws (numerator r)) (app_fromInteger_ws (denominator r))
 							
 -- | A dyadic number is of the form @m * 2^e@ where @m@ is the /mantissa/ and @e@ is the /exponent/.
 data Dyadic = Dyadic { mant :: Integer, expo :: Int }
@@ -261,6 +259,7 @@ instance ApproximateField Dyadic where
   app_abs s a = normalize s (abs a)
   app_signum s a = normalize s (signum a)
   app_fromInteger s i   = normalize s (fromInteger i)
+  app_fromInteger_ws i = (fromInteger i)
 
   app_inv s NaN = normalize s NaN
   app_inv s PositiveInfinity = zero
@@ -289,6 +288,9 @@ instance ApproximateField Dyadic where
   app_shift s PositiveInfinity k = PositiveInfinity
   app_shift s NegativeInfinity k = NegativeInfinity
   app_shift s Dyadic {mant=m, expo=e} k = normalize s (Dyadic {mant = m, expo = e + k})
-
+  
+  toRational' NaN = error"It's not a rational number"
+  toRational' PositiveInfinity = error"It's not a rational number"
+  toRational' NegativeInfinity = error"It's not a rational number"
   toRational' Dyadic {mant=m, expo=e} = if signum e == -1 then (toRational m)/2^(-e) else (toRational m)*2^e
   
