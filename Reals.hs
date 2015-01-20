@@ -316,5 +316,42 @@ instance IntervalDomain q => Floating (RealNum q) where
              )    
 
     acosh x = error "Not implemented"
-    atanh x = error "Not implemented"
-    log x = error "Not implemented" 
+    atanh x = (log (1+x) - log (1-x))/2
+    log x = let b = compare x 0
+            in case b of 
+                LT -> error "Not defined"
+                GT -> let b' = compare x 2
+                      in case b' of 
+                          LT -> let b'' = compare x 1
+                                in case b'' of 
+                                    LT -> limit (\s->
+                                           let r = rounding s 
+                                               n = precision s
+                                               border h k m = let (t,r') = case m of
+                                                                             -1 -> (toRational' (lower (approximate x (prec RoundDown h))),RoundDown)
+                                                                             1 -> (toRational' (upper (approximate x (prec RoundDown h))),RoundUp)
+                                                                  h' = toRational h                                                
+                                                                  serie = -sum [(-1)^(tI i)*(-1+t)^(tI i)/i|i <- [1..h']]
+                                                                  reminder = 3^(ceiling (abs t))/2*(-1+t)^(tI h'+1)/(h'+1) 
+                                                                  part = serie + m*reminder                                                  
+                                                              in app_fromRational (prec r' k) part                                       
+                                           in case r of            
+                                               RoundDown -> Interval {lower = maximum [border i n (-1)| i <- [1..n]], upper = minimum [border i n 1| i <- [1..n]]}
+                                               RoundUp -> Interval {lower = minimum [border i n 1| i <- [1..n]], upper = maximum [border i n (-1)| i <- [1..n]]}                     
+                                          )
+                                    GT -> limit (\s->
+                                           let r = rounding s 
+                                               n = precision s
+                                               border h k m = let (t,r') = case m of
+                                                                             -1 -> (toRational' (lower (approximate x (prec RoundDown h))),RoundDown)
+                                                                             1 -> (toRational' (upper (approximate x (prec RoundDown h))),RoundUp)
+                                                                  h' = toRational h                                                
+                                                                  serie = -sum [(-1)^(tI i)*(-1+t)^(tI i)/i|i <- [1..h']]
+                                                                  reminder = (-1+t)^(tI h'+1)/(h'+1) 
+                                                                  part = serie + m*reminder                                                  
+                                                              in app_fromRational (prec r' k) part                                       
+                                           in case r of            
+                                               RoundDown -> Interval {lower = maximum [border i n (-1)| i <- [1..n]], upper = minimum [border i n 1| i <- [1..n]]}
+                                               RoundUp -> Interval {lower = minimum [border i n 1| i <- [1..n]], upper = maximum [border i n (-1)| i <- [1..n]]}                     
+                                          )
+                          GT -> error "Not defined"
