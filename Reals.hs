@@ -118,7 +118,6 @@ instance IntervalDomain q => Overt (ClosedInterval q) (RealNum q) where
      )
      
 -- | We define the a particular implementation of reals in terms of Dyadic numbers.
--- We need to implement only width. 
 instance IntervalDomain Dyadic where
      width Interval{lower=a, upper=b} = b - a 
 
@@ -128,7 +127,7 @@ instance IntervalDomain Dyadic where
 exact :: RealNum Dyadic -> RealNum Dyadic
 exact x = x
 
--- | This function convert elements of type @q@ in elements of type @RealNum q@.
+-- | Function convert elements of type @q@ in elements of type @RealNum q@.
 toReal :: IntervalDomain q => q -> RealNum q
 toReal x = limit $ \s -> Interval { lower = normalize s x, upper = normalize (anti s) x }
             
@@ -156,21 +155,21 @@ lim x =
 -- function 'approx_to x k r' computes an approximation @a@ of type @q@ which is within
 -- @2^-k@ of @x@.
 approx_to :: IntervalDomain q => RealNum q -> Int -> RoundingMode -> (q, Int)
-approx_to x k r = let r10 = toRational' (width (approximate x (prec r 10)))
-                      r20 = toRational' (width (approximate x (prec r 20)))
-                      n = case r20==0 of
-                            True -> 20
+approx_to x k r = let r10 = abs (toRational' (width (approximate x (prec r 10))))
+                      r20 = abs (toRational' (width (approximate x (prec r 20))))
+                      n = case r20 == 0 of
+                            True  -> 20
                             False -> let a = ceiling (r10^2/r20)
                                      in (ilogb 2 a)+k
                       i = approximate x (prec r n)
                       q = 2/2^k 
-                  in case toRational' (width i) < q of
-                      True -> (midpoint (lower i) (upper i), n)
+                  in case abs (toRational' (width i)) < q of
+                      True  -> (midpoint (lower i) (upper i), n)
                       False -> loop (n+1)
                                 where loop m = let i = approximate x (prec r m)
-                                               in case toRational' (width i) < q of 
-                                                   True -> (midpoint (lower i) (upper i), m)
-                                                   False -> loop $ m+1
+                                               in case abs (toRational' (width i)) < q of 
+                                                   True  -> (midpoint (lower i) (upper i), m)
+                                                   False -> loop (m+1)
 
 fac :: Rational -> Rational
 fac n = product [1..n]
@@ -195,7 +194,7 @@ ilogb b n | n < 0      = ilogb b (- n)
 -- | Instance floating for reals uses Taylor's series and error bounds. (Missing: Atanh, Atan, Acos, Acosh)
 -- Functions (Cos, Sin, Exp, Tan, Cosh, Sinh) makes good approximations in short time for elements inside 
 -- the interval (-30,30) and for integers. Log is defined for elements inside (0,2) and Asinh for elements 
--- inside (-1,1).                                      
+-- inside (-1,1). For more details see http://www.diva-portal.org/smash/get/diva2:310454/FULLTEXT01.pdf                                     
 instance IntervalDomain q => Floating (RealNum q) where
 
     pi = limit(\s -> 
@@ -211,7 +210,7 @@ instance IntervalDomain q => Floating (RealNum q) where
          
     exp x = limit (\s->
                  let r = rounding s 
-                     n = precision s + 4 
+                     n = precision s + 4
                      sig = if r == RoundDown then 1 else (-1) 
                      q1 = toRational' (lower (approximate x (prec r 4)))
                      q2 = toRational' (upper (approximate x (prec r 4)))
@@ -225,10 +224,10 @@ instance IntervalDomain q => Floating (RealNum q) where
                                              True -> p
                                              False -> loop (p+1)
                      serie t = sum [t^(tI i)/(fac i)|i <- [0..u]]
-                     k = maximum [snd (approx_to x v r), n]
+                     k = maximum [snd (approx_to x (v+1) r), n]
                      x1 = toRational' (lower (approximate x (prec r k)))
                      x2 = toRational' (upper (approximate x (prec r k)))
-                     remainder = 1/2^(n-1)
+                     remainder = 3/2^n
                      s' = prec r k
                      part1 = app_fromRational s' ((serie x1) - sig*remainder)
                      part2 = app_fromRational (anti s') ((serie x2) + sig*remainder)
@@ -248,7 +247,7 @@ instance IntervalDomain q => Floating (RealNum q) where
                                         h' = toRational h                                             
                                         (serie, remainder) = case (t >= 1,t <= -1) of
                                                                (False, False) -> (sum [(-1)^(tI i)*(fac (2*i))*t^(2*(tI i)+1)/(2^(2*(tI i))*(fac i)^2*(2*i+1))|i <- [0..h']],
-                                                                                  abs $ 1/(1-(abs t))*(abs t)^(2*(tI h')+2))
+                                                                                  1/(1-(abs t))*(abs t)^(2*(tI h')+2))
                                                                (True,  False) -> (1,0)
                                                                (False, True)  -> ((-1),0)
                                         part = serie + m*remainder
@@ -260,13 +259,13 @@ instance IntervalDomain q => Floating (RealNum q) where
 
     cos x = limit (\s->
                  let r = rounding s 
-                     n = precision s + 4 
+                     n = precision s + 4
                      sig = if r == RoundDown then 1 else (-1) 
                      q1 = toRational' (lower (approximate x (prec r 4)))
                      q2 = toRational' (upper (approximate x (prec r 4)))
                      m = ceiling (maximum [abs q1, abs q2])
                      m' = toRational m
-                     v = n + (ilogb 2 (3^m+1))  
+                     v = n + (ilogb 2 (3^m))  
                      u = loop m'
                           where loop p = let m1 = 2^n*(3^m+1)*m'^(2*(tI p)+2)
                                              m2 = 2*(fac (2*p+2)) 
@@ -274,10 +273,10 @@ instance IntervalDomain q => Floating (RealNum q) where
                                              True -> p
                                              False -> loop (p+1)
                      serie t = sum [(-1)^(tI i)*t^(2*(tI i))/(fac (2*i))|i <- [0..u]]
-                     k = maximum [snd (approx_to x v r), n]
+                     k = maximum [snd (approx_to x (v+1) r), n]
                      x1 = toRational' (lower (approximate x (prec r k)))
                      x2 = toRational' (upper (approximate x (prec r k)))
-                     remainder = 1/2^(n-1)
+                     remainder = 3/2^n
                      s' = prec r k
                      part1 = app_fromRational s' ((serie x1) - sig*remainder)
                      part2 = app_fromRational (anti s') ((serie x2) + sig*remainder)
@@ -292,7 +291,7 @@ instance IntervalDomain q => Floating (RealNum q) where
                      q2 = toRational' (upper (approximate x (prec r 4)))
                      m = ceiling (maximum [abs q1, abs q2])
                      m' = toRational m
-                     v = n + (ilogb 2 (3^m))
+                     v = n + (ilogb 2 (3^m+1))
                      u = loop m'
                           where loop p = let m1 = 2^n*(3^m+1)*m'^(2*(tI p)+3)
                                              m2 = 2*(fac (2*p+3)) 
@@ -300,10 +299,10 @@ instance IntervalDomain q => Floating (RealNum q) where
                                              True -> p
                                              False -> loop (p+1)
                      serie t = sum [(-1)^(tI i)*t^(2*(tI i)+1)/(fac (2*i+1))|i <- [0..u]]
-                     k = maximum [snd (approx_to x v r), n]
+                     k = maximum [snd (approx_to x (v+1) r), n]
                      x1 = toRational' (lower (approximate x (prec r k)))
                      x2 = toRational' (upper (approximate x (prec r k)))
-                     remainder = 1/2^(n-1)
+                     remainder = 3/2^n
                      s' = prec r k
                      part1 = app_fromRational s' ((serie x1) - sig*remainder)
                      part2 = app_fromRational (anti s') ((serie x2) + sig*remainder)
@@ -321,7 +320,7 @@ instance IntervalDomain q => Floating (RealNum q) where
                                 in case b'' of 
                                     LT -> limit (\s->
                                            let r = rounding s 
-                                               n = precision s
+                                               n = precision s + 1
                                                border h k m = let (t,r') = case m of
                                                                              -1 -> (toRational' (lower (approximate x (prec RoundDown h))),RoundDown)
                                                                              1 -> (toRational' (upper (approximate x (prec RoundDown h))),RoundUp)
@@ -336,7 +335,7 @@ instance IntervalDomain q => Floating (RealNum q) where
                                           )
                                     GT -> limit (\s->
                                            let r = rounding s 
-                                               n = precision s
+                                               n = precision s + 1
                                                border h k m = let (t,r') = case m of
                                                                              -1 -> (toRational' (lower (approximate x (prec RoundDown h))),RoundDown)
                                                                              1 -> (toRational' (upper (approximate x (prec RoundDown h))),RoundUp)
