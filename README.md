@@ -5,7 +5,7 @@ Repozitorij za projekt Računanje z eksaktnimi realnimi števili (MFP)
 Za uporabo je treba paket namestiti s programom Cabal.
 
 ## Realna števila
-Realna števila so reprezentirana kot presek padajoče verige intervalov diadičih števil. Enako število ima lahko različne reprezentacije.
+Realna števila so reprezentirana kot presek padajoče verige  zaprtih intervalov, katerih dolžine konvergirajo proti nič. Robovi intervalov so diadična števila.
 ### Osnovne operacije na realnih številih
 ```
 *Reals> let a=exact 1.3
@@ -36,7 +36,7 @@ True
 False
 ```
 ### Naprednejše funkcije
-Implementirana je funkcija `approx_to`, ki za dano realno število vrne približek v obliki diadičnega števila na natančnost 2^(-k).
+Implementirana je funkcija `approx_to`, ki za dano realno število vrne približek v obliki diadičnega števila na izbrano natančnost. 
 ```
 *Reals> approx_to (exact 2/3) 60 RoundDown
 (3074457345618258602*2^-62,60)
