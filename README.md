@@ -5,7 +5,7 @@ Repozitorij za projekt Računanje z eksaktnimi realnimi števili (MFP)
 Za uporabo je treba paket namestiti s programom Cabal.
 
 ## Realna števila
-Realna števila so reprezentirana kot presek padajoče verige  zaprtih intervalov, katerih dolžine konvergirajo proti nič. Robovi intervalov so diadična števila.
+Realno število je reprezentirano kot presek padajoče verige  zaprtih intervalov, katerih dolžine konvergirajo proti nič. Robovi intervalov so diadična števila.
 ### Osnovne operacije na realnih številih
 ```
 *Reals> let a=exact 1.3
